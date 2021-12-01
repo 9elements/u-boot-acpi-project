@@ -3,6 +3,11 @@
  * (C) Copyright 2012-2016 Stephen Warren
  */
 
+#define LOG_CATEGORY LOGC_BOARD
+
+#define DEBUG
+#define LOG_DEBUG
+
 #include <common.h>
 #include <config.h>
 #include <dm.h>
@@ -11,19 +16,31 @@
 #include <fdt_support.h>
 #include <fdt_simplefb.h>
 #include <init.h>
+#include <log.h>
 #include <memalign.h>
 #include <mmc.h>
+#include <signatures.h>
+#include <tables_csum.h>
+#include <acpi/acpi_table.h>
+#include <asm/acpi_table.h>
+#include <asm/global_data.h>
 #include <asm/gpio.h>
 #include <asm/arch/mbox.h>
 #include <asm/arch/msg.h>
 #include <asm/arch/sdhci.h>
-#include <asm/global_data.h>
+#include <asm/arch/acpi/bcm2836.h>
+#include <dm/acpi.h>
 #include <dm/platform_data/serial_bcm283x_mu.h>
 #ifdef CONFIG_ARM64
 #include <asm/armv8/mmu.h>
 #endif
 #include <watchdog.h>
 #include <dm/pinctrl.h>
+#ifdef CONFIG_GENERATE_ACPI_TABLE
+#include "acpitables.h"
+#endif
+#include <asm/armv8/sec_firmware.h>
+#include <serial.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -585,6 +602,145 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	efi_add_memory_map(0, CONFIG_RPI_EFI_NR_SPIN_PAGES << EFI_PAGE_SHIFT,
 			   EFI_RESERVED_MEMORY_TYPE);
 #endif
+
+	return 0;
+}
+
+
+static int rpi_write_dbg2(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+{
+	u64 addr = 0xfe201000;
+	char *name = "\\_SB.GDV0.URT0";
+
+	//TODO mini UART is not 100% compatible to 16550 (some registers are missing)
+	acpi_16550_mmio32_write_dbg2_uart(ctx, addr, name);
+
+	return 0;
+};
+ACPI_WRITER(5dbg2, "DBG2", rpi_write_dbg2, 0);
+
+#if 0
+/* Need to add a logo first */
+static int rpi_write_bgrt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+{
+	struct acpi_table_header *header;
+	struct acpi_bgrt_header *bgrt;
+
+	bgrt = ctx->current;
+	header = &dbg2->header;
+
+	memset(bgrt, '\0', sizeof(struct acpi_bgrt));
+
+	acpi_fill_header(header, "BGRT");
+	header->revision = 0;
+
+	acpi_inc(ctx, header->length);
+
+	return 0;
+};
+ACPI_WRITER(5bgrt, "BGRT", rpi_write_bgrt, 0);
+#endif
+
+/* DMA Controller Vendor Data */
+struct __packed dma_ctlr_vendor_data {
+	u32 length;
+	u32 type;
+	u64 chan_base;
+	u32 chan_size;
+	u64 ctlr_base;
+	u32 ctlr_size;
+	u32 chan_count;
+	u32 ctlr_irq;
+	u32 min_req_line;
+	u32 max_req_line;
+	u8 cache_coherent;
+};
+
+/* DMA Controller */
+struct __packed rd_dma_ctlr {
+	struct acpi_csrt_descriptor hdr;
+	struct dma_ctlr_vendor_data data;
+};
+
+/* dma chan vendor data */
+struct __packed dma_chan_vendor_data {
+	u32 chan;
+	u32 chan_irq;
+	u16 is_reserved;
+	u16 addr_incr;
+};
+
+/* dma chan */
+struct __packed rd_dma_chan {
+	struct acpi_csrt_descriptor hdr;
+	struct dma_chan_vendor_data data;
+};
+
+/* dma resource group */
+struct __packed rg_dma {
+	struct acpi_csrt_group hdr;
+	struct rd_dma_ctlr ctlr;
+	struct rd_dma_chan chan[];
+};
+
+#define RPI_DMA_MAX_REQ_LINES 32
+
+static void add_cmd_chan(struct rd_dma_chan *dmac, uint uid, uint chan,
+			 uint chan_irq, bool is_reserved, int addr_incr)
+{
+	memset(dmac, '\0', sizeof(*dmac));
+	dmac->hdr.length = sizeof(struct rd_dma_chan);
+	dmac->hdr.type = EFI_ACPI_CSRT_RESOURCE_TYPE_DMA;
+	dmac->hdr.subtype = EFI_ACPI_CSRT_RESOURCE_SUBTYPE_DMA_CHANNEL;
+	dmac->hdr.uid = uid;
+
+	dmac->data.chan = chan;
+	dmac->data.chan_irq = chan_irq;
+	dmac->data.is_reserved = is_reserved;
+	dmac->data.addr_incr = addr_incr;
+}
+
+int acpi_fill_csrt(struct acpi_ctx *ctx)
+{
+	struct dma_ctlr_vendor_data *data;
+	struct acpi_csrt_group *hdr;
+	struct rg_dma *dma;
+	int i;
+
+	dma = ctx->current;
+	hdr = &dma->hdr;
+	memset(hdr, '\0', sizeof(*hdr));
+	hdr->length = 0;
+	hdr->vendor_id = SIGNATURE_32('R', 'P', 'I', 'F');
+	hdr->device_id = EFI_ACPI_CSRT_DEVICE_ID_DMA;
+
+	dma->ctlr.hdr.length = sizeof(struct rd_dma_ctlr);
+	dma->ctlr.hdr.type = EFI_ACPI_CSRT_RESOURCE_TYPE_DMA;
+	dma->ctlr.hdr.subtype = EFI_ACPI_CSRT_RESOURCE_SUBTYPE_DMA_CONTROLLER;
+	dma->ctlr.hdr.uid = EFI_ACPI_CSRT_RESOURCE_ID_IN_DMA_GRP;
+
+	data = &dma->ctlr.data;
+	data->length = sizeof(struct dma_ctlr_vendor_data);
+	data->type = 1;
+	data->chan_base = BCM2836_DMA0_BASE_ADDRESS;
+	data->chan_size = RPI_DMA_CHANNEL_COUNT * BCM2836_DMA_CHANNEL_LENGTH;
+	data->ctlr_base = BCM2836_DMA_CTRL_BASE_ADDRESS;
+	data->ctlr_size = 8;
+	data->chan_count = RPI_DMA_USED_CHANNEL_COUNT;
+	data->max_req_line = RPI_DMA_MAX_REQ_LINES - 1;
+
+	acpi_inc(ctx, sizeof(struct rg_dma));
+
+	for (i = 0; i < 10; i++) {
+		add_cmd_chan(&dma->chan[i],
+			     EFI_ACPI_CSRT_RESOURCE_ID_IN_DMA_GRP + 1 + i, i,
+			     0x30 + i,
+			     i == 1 || i == 2 || i == 3 || i == 6 || i == 7,
+			     i == 4);
+		acpi_inc(ctx, sizeof(struct rd_dma_chan));
+	}
+
+	hdr->length = (u32)(ctx->current - (void *)dma);
 
 	return 0;
 }
