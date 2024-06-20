@@ -1,0 +1,4 @@
+fatload mmc 0:1 ${kernel_addr_r} Image
+fatsize mmc 0:1 Image
+#setenv bootargs "console=ttyS0,115200 console=tty1"
+bootefi ${kernel_addr_r}:${filesize} -
