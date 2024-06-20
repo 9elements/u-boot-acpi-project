@@ -1,0 +1,77 @@
+name: Go
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  linters:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22.x'
+    - name: Check vendored dependencies
+      run: |
+        go mod tidy
+        go mod verify
+        go mod vendor -v
+        git status
+        if [[ -n "$(git status --porcelain vendor)" ]]; then
+          echo 'vendor/ is out-of-date: run `go mod tidy && go mod vendor` and then check in the changes'
+          echo 'If `go mod tidy && go mod vendor` results in no changes, make sure you are using the latest relase of Go'
+          git status --porcelain vendor
+          exit 1
+        fi
+    - name: gofmt
+      run: test -z "$(gofmt -s -l $(find -name '*.go' | grep -v /vendor/))"
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22.x'
+
+    - name: Build
+      run: go build -mod=mod -v ./...
+
+    - name: Vet Test
+      run: go vet -composites=false -mod=mod ./...
+
+    - name: Test
+      run: "CGO_ENABLED=0 go env && CGO_ENABLED=0 go test -mod=mod  ./pkg/uroot/..."
+
+  badbuild:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22.x'
+
+    - name: Build fail
+      id: buildfail
+      continue-on-error: true
+      run: |
+        echo bad >> cmds/core/date/date.go
+        go build .
+        ./u-root
+
+    - name: Fail if Build Failure did not fail
+      run: |
+        echo buildfail got ${{ steps.buildfail.outcome }} and should get failure
+        bash -c "if [[ ${{ steps.buildfail.outcome }} == failure ]]; then exit 0; else exit 1; fi"

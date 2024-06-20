@@ -1,0 +1,34 @@
+run:
+  skip-dirs:
+    - pkg/uroot/test
+
+linters:
+  disable-all: true
+  enable:
+    - revive
+    - ineffassign
+    - staticcheck
+    - stylecheck
+
+linters-settings:
+  staticcheck:
+    checks: ["all", "-SA1019"]
+  stylecheck:
+    checks: ["all", "-ST1003"]
+
+issues:
+  exclude-rules:
+    - linters: revive
+      text: "don't use underscores"
+    - linters: revive
+      text: "don't use ALL_CAPS"
+    - linters: revive
+      text: "stutter"
+    - linters: revive
+      text: "unexported-return"
+    - linters: revive
+      text: "unused-parameter"
+    - linters: revive
+      text: "superfluous-else"
+    - linters: revive
+      text: "empty-block"
