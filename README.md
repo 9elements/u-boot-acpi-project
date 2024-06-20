@@ -23,9 +23,8 @@ cd -
 
 ```
 cd linux
-echo "\nCONFIG_INITRAMFS_SOURCE=\"../u-root/initramfs.cpio\"" >> arch/arm64/configs/bcm2711_defconfig
-echo "\nCONFIG_CMDLINE=\"../u-root/initramfs.cpio\""          >> arch/arm64/configs/bcm2711_defconfig
-echo "\nCONFIG_CMDLINE_FORCE=y"                               >> arch/arm64/configs/bcm2711_defconfig
+echo "CONFIG_INITRAMFS_SOURCE=\"../u-root/initramfs.cpio\"" >> arch/arm64/configs/bcm2711_defconfig
+echo "CONFIG_CMDLINE_FORCE=y"                               >> arch/arm64/configs/bcm2711_defconfig
 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make bcm2711_defconfig
 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -j$(nproc)
 cd -
@@ -35,8 +34,8 @@ cd -
 
 ```
 cd u-boot
-ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make rpi_4_defconfig
-ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -j$(nproc)
+ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- make rpi_4_defconfig
+ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- make -j$(nproc)
 cd -
 ```
 
