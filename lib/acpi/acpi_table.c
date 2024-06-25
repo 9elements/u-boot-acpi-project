@@ -201,6 +201,51 @@ int acpi_add_table(struct acpi_ctx *ctx, void *table)
 	return 0;
 }
 
+__weak void acpi_fill_fadt(struct acpi_fadt *fadt)
+{
+}
+
+int acpi_write_fadt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+{
+	struct acpi_table_header *header;
+	struct acpi_fadt *fadt;
+
+	fadt = ctx->current;
+	header = &fadt->header;
+
+	memset((void *)fadt, '\0', sizeof(struct acpi_fadt));
+
+	acpi_fill_header(header, "FACP");
+	header->length = sizeof(struct acpi_fadt);
+	header->revision = ACPI_FADT_REV_ACPI_6_0;
+	memcpy(header->oem_id, OEM_ID, 6);
+	memcpy(header->oem_table_id, OEM_TABLE_ID, 8);
+	memcpy(header->creator_id, ASLC_ID, 4);
+	header->creator_revision = 1;
+
+	fadt->x_firmware_ctrl = map_to_sysmem(ctx->facs);
+	fadt->x_dsdt = map_to_sysmem(ctx->dsdt);
+
+	if (fadt->x_firmware_ctrl < 0x100000000UL)
+		fadt->firmware_ctrl = fadt->x_firmware_ctrl;
+	else
+		fadt->firmware_ctrl = 0;
+
+	if (fadt->x_dsdt < 0x100000000UL)
+		fadt->dsdt = fadt->x_dsdt;
+	else
+		fadt->dsdt = 0;
+
+	fadt->preferred_pm_profile = ACPI_PM_UNSPECIFIED;
+
+	acpi_fill_fadt(fadt);
+
+	header->checksum = table_compute_checksum(fadt, header->length);
+
+	return acpi_add_fadt(ctx, fadt);
+}
+ACPI_WRITER(5fadt, "FADT", acpi_write_fadt, 0);
+
 static void acpi_create_dbg2(struct acpi_dbg2_header *dbg2,
 		      int port_type, int port_subtype,
 		      struct acpi_gen_regaddr *address, u32 address_size,
