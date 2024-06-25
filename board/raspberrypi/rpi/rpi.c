@@ -620,41 +620,29 @@ int last_stage_init(void)
 }
 EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);
 
-static int rpi_write_facp(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+static int rpi_write_fadt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
 {
 	struct acpi_table_header *header;
 	struct acpi_fadt *fadt;
 
 	fadt = ctx->current;
-	header = &fadt->header;
-
-	memset(fadt, '\0', sizeof(struct acpi_fadt));
-
-	acpi_fill_header(header, "FACP");
-	header->length = sizeof(struct acpi_fadt);
-	header->revision = ACPI_FADT_REV_ACPI_6_0;
+	acpi_fadt_common(fadt, ctx->facs, ctx->dsdt);
 
 	fadt->firmware_ctrl = (ulong)ctx->facs;
 	fadt->dsdt = (ulong)ctx->dsdt;
 	fadt->preferred_pm_profile = ACPI_PM_APPLIANCE_PC;
-
-	fadt->flags = ACPI_FADT_WBINVD | ACPI_FADT_SLEEP_BUTTON |
-		ACPI_FADT_HW_REDUCED_ACPI;
-	//fadt->arm_boot_arch = ACPI_ARM_PSCI_COMPLIANT;
+	//fadt->flags = ACPI_FADT_WBINVD | ACPI_FADT_SLEEP_BUTTON | ACPI_FADT_HW_REDUCED_ACPI;
+	fadt->flags = ACPI_FADT_HW_REDUCED_ACPI | ACPI_FADT_LOW_PWR_IDLE_S0; // from coreboot
+	//fadt->arm_boot_arch |= ACPI_ARM_PSCI_COMPLIANT;
 	fadt->minor_revision = 3;
+	fadt->header.revision = ACPI_FADT_REV_ACPI_6_0; //TODO see if it works
 
-	fadt->x_firmware_ctrl = (ulong)ctx->facs;
-	fadt->x_dsdt = (ulong)ctx->dsdt;
-
+	header = &fadt->header;
 	header->checksum = table_compute_checksum(fadt, header->length);
 
-	acpi_add_table(ctx, fadt);
-
-	acpi_inc(ctx, sizeof(struct acpi_fadt));
-
-	return 0;
+	return acpi_add_fadt(ctx, fadt);
 }
-ACPI_WRITER(5facp, "FACP", rpi_write_facp, 0);
+ACPI_WRITER(5fadt, "FADT", rpi_write_fadt, 0);
 
 #define GTDT_FLAG_INT_ACTIVE_LOW	BIT(1)
 #define RPI_GTDT_GTIMER_FLAGS		GTDT_FLAG_INT_ACTIVE_LOW
