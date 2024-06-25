@@ -5,6 +5,9 @@
 
 #define LOG_CATEGORY LOGC_BOARD
 
+#define DEBUG
+#define LOG_DEBUG
+
 #include <common.h>
 #include <config.h>
 #include <dm.h>
@@ -36,6 +39,7 @@
 #ifdef CONFIG_GENERATE_ACPI_TABLE
 #include "acpitables.h"
 #endif
+#include <serial.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -616,41 +620,29 @@ int last_stage_init(void)
 }
 EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);
 
-static int rpi_write_facp(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+static int rpi_write_fadt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
 {
 	struct acpi_table_header *header;
 	struct acpi_fadt *fadt;
 
 	fadt = ctx->current;
-	header = &fadt->header;
-
-	memset(fadt, '\0', sizeof(struct acpi_fadt));
-
-	acpi_fill_header(header, "FACP");
-	header->length = sizeof(struct acpi_fadt);
-	header->revision = ACPI_FADT_REV_ACPI_6_0;
+	acpi_fadt_common(fadt, ctx->facs, ctx->dsdt);
 
 	fadt->firmware_ctrl = (ulong)ctx->facs;
 	fadt->dsdt = (ulong)ctx->dsdt;
 	fadt->preferred_pm_profile = ACPI_PM_APPLIANCE_PC;
-
-	fadt->flags = ACPI_FADT_WBINVD | ACPI_FADT_SLEEP_BUTTON |
-		ACPI_FADT_HW_REDUCED_ACPI;
-	fadt->arm_boot_arch = ACPI_ARM_PSCI_COMPLIANT;
+	//fadt->flags = ACPI_FADT_WBINVD | ACPI_FADT_SLEEP_BUTTON | ACPI_FADT_HW_REDUCED_ACPI;
+	fadt->flags = ACPI_FADT_HW_REDUCED_ACPI | ACPI_FADT_LOW_PWR_IDLE_S0; // from coreboot
+	//fadt->arm_boot_arch |= ACPI_ARM_PSCI_COMPLIANT;
 	fadt->minor_revision = 3;
+	fadt->header.revision = ACPI_FADT_REV_ACPI_6_0; //TODO see if it works
 
-	fadt->x_firmware_ctrl = (ulong)ctx->facs;
-	fadt->x_dsdt = (ulong)ctx->dsdt;
-
+	header = &fadt->header;
 	header->checksum = table_compute_checksum(fadt, header->length);
 
-	acpi_add_table(ctx, fadt);
-
-	acpi_inc(ctx, sizeof(struct acpi_fadt));
-
-	return 0;
+	return acpi_add_fadt(ctx, fadt);
 }
-ACPI_WRITER(5facp, "FACP", rpi_write_facp, 0);
+ACPI_WRITER(5fadt, "FADT", rpi_write_fadt, 0);
 
 #define GTDT_FLAG_INT_ACTIVE_LOW	BIT(1)
 #define RPI_GTDT_GTIMER_FLAGS		GTDT_FLAG_INT_ACTIVE_LOW
@@ -695,58 +687,11 @@ ACPI_WRITER(5gtdt, "GTDT", rpi_write_gtdt, 0);
 
 static int rpi_write_dbg2(struct acpi_ctx *ctx, const struct acpi_writer *entry)
 {
-	struct acpi_table_header *header;
-	struct acpi_dbg2_header *dbg2;
-	struct acpi_dbg2_device *ddev;
-	struct acpi_gen_regaddr *addr;
-	u32 *addr_size;
-	char *name;
-	void *end;
+	u64 addr = 0xfe201000;
+	char *name = "\\_SB.GDV0.URT0";
 
-	dbg2 = ctx->current;
-	header = &dbg2->header;
-
-	/* Note this doesn't zero everything */
-	memset(dbg2, '\0', sizeof(struct acpi_dbg2_header));
-
-	acpi_fill_header(header, "DBG2");
-	header->revision = 0;
-
-	dbg2->devices_offset = sizeof(*dbg2);
-	dbg2->devices_count = 1;
-
-	ddev = (void *)(dbg2 + 1);
-	ddev->revision = 0;
-	ddev->length = 0x35;
-	ddev->address_count = 1;
-	ddev->namespace_string_length = 0xf;
-	ddev->namespace_string_offset = 0x26;
-	ddev->oem_data_length = 0;
-	ddev->oem_data_offset = 0;
-	ddev->port_type = ACPI_DBG2_SERIAL_PORT;
-	ddev->port_subtype = ACPI_DBG2_ARM_PL011;
-
-	addr = (void *)(ddev + 1);
-	ddev->base_address_offset = sizeof(*ddev);
-	ddev->address_size_offset = sizeof(*ddev) + sizeof(*addr);
-
-	addr->space_id = ACPI_ADDRESS_SPACE_MEMORY;
-	addr->bit_width = 32;
-	addr->bit_offset = 0;
-	addr->access_size = ACPI_ACCESS_SIZE_DWORD_ACCESS;
-	addr->addrl = 0xfe201000;
-	addr->addrh = 0;
-
-	addr_size = (u32 *)(addr + 1);
-	*addr_size = 0x1000;
-
-	name = (char *)(addr_size + 1);
-	strcpy(name, "\\_SB.GDV0.URT0");
-	end = name + strlen(name) + 1;
-	header->length = end - ctx->current;
-	acpi_add_table(ctx, dbg2);
-
-	acpi_inc(ctx, header->length);
+	//TODO mini UART is not 100% compatible to 16550 (some registers are missing)
+	acpi_16550_mmio32_write_dbg2_uart(ctx, addr, name);
 
 	return 0;
 };
