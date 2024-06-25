@@ -927,6 +927,18 @@ void acpi_fill_header(struct acpi_table_header *header, char *signature);
 int acpi_fill_csrt(struct acpi_ctx *ctx);
 
 /**
+ * acpi_fadt_common() - Handle common parts of filling out an FADT
+ *
+ * This sets up the Fixed ACPI Description Table
+ *
+ * @fadt: Pointer to place to put FADT
+ * @facs: Pointer to the FACS
+ * @dsdt: Pointer to the DSDT
+ */
+void acpi_fadt_common(struct acpi_fadt *fadt, struct acpi_facs *facs,
+		      void *dsdt);
+
+/**
  * acpi_write_dbg2_pci_uart() - Write out a DBG2 table
  *
  * @ctx: Current ACPI context
