@@ -66,3 +66,13 @@ unmount /mnt
 ```
 
 Now plug out the SD card and put it into the raspberry PI 4 B
+
+## Workflow
+
+This project uses git subtrees. The Idea is that you only use this repository to make changes and leave the u-boot-acpi repo alone.
+
+If you do changes inside of the u-boot repository you can commit them like usual. In order to push a commit that makes changes inside the u-boot directory do the following command:
+```
+git subtree push --prefix u-boot [remote that points to u-boot-acpi repo] master
+```
+This will automatically push the changes to the u-boot-acpi repository as well as keep the change in this repository.
