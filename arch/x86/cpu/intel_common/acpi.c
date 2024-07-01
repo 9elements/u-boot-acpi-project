@@ -101,8 +101,11 @@ static unsigned long acpi_madt_irq_overrides(unsigned long current)
 	return current;
 }
 
-u32 acpi_fill_madt(u32 current)
+u32 acpi_fill_madt(struct acpi_madt *madt, void *current)
 {
+	madt->lapic_addr = LAPIC_DEFAULT_BASE;
+	madt->flags = ACPI_MADT_PCAT_COMPAT;
+
 	/* Local APICs */
 	current += acpi_create_madt_lapics(current);
 

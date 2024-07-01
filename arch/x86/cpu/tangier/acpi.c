@@ -30,8 +30,11 @@ void acpi_fill_fadt(struct acpi_fadt *fadt)
 		ACPI_FADT_HW_REDUCED_ACPI;
 }
 
-u32 acpi_fill_madt(u32 current)
+u32 acpi_fill_madt(struct acpi_madt *madt, void *current)
 {
+	madt->lapic_addr = LAPIC_DEFAULT_BASE;
+	madt->flags = ACPI_MADT_PCAT_COMPAT;
+
 	current += acpi_create_madt_lapics(current);
 
 	current += acpi_create_madt_ioapic((struct acpi_madt_ioapic *)current,
