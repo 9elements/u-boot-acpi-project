@@ -24,6 +24,7 @@ jobs:
         working-directory: ./u-root
         env:
           GOARCH: arm64
+          GOFLAGS: "-buildvcs=false"
         run: |
           go build .
           ./u-root -defaultsh gosh -o initramfs.cpio boot coreboot-app ./cmds/core/* ./cmds/boot/*
