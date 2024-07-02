@@ -927,16 +927,24 @@ void acpi_fill_header(struct acpi_table_header *header, char *signature);
 int acpi_fill_csrt(struct acpi_ctx *ctx);
 
 /**
- * acpi_fadt_common() - Handle common parts of filling out an FADT
+ * acpi_fill_fadt() - Fill out the body of the FADT
  *
- * This sets up the Fixed ACPI Description Table
+ * Should be implemented in SoC specific code.
  *
- * @fadt: Pointer to place to put FADT
- * @facs: Pointer to the FACS
- * @dsdt: Pointer to the DSDT
+ * @fadt: Pointer to FADT to update
  */
-void acpi_fadt_common(struct acpi_fadt *fadt, struct acpi_facs *facs,
-		      void *dsdt);
+void acpi_fill_fadt(struct acpi_fadt *fadt);
+
+/**
+ * acpi_fill_madt() - Fill out the body of the MADT
+ *
+ * Must be implemented in SoC specific code.
+ *
+ * @madt: The MADT to update
+ * @current: Pointer to the MADT body
+ * @return Pointer to the end of tables, where the next tables can be written
+ */
+void *acpi_fill_madt(struct acpi_madt *madt, void *current);
 
 /**
  * acpi_write_dbg2_pci_uart() - Write out a DBG2 table

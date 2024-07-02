@@ -86,7 +86,7 @@
 #define GENET_BASE_ADDRESS         FixedPcdGet64 (PcdBcmGenetRegistersAddress)
 #define GENET_LENGTH               0x00010000
 
-#define THERM_SENSOR               0xfd5d2200
+#define THERM_SENSOR               0x7d5d2200
 
 #define ID_CHIPREV                 0xfc404000
 

@@ -201,29 +201,80 @@ int acpi_add_table(struct acpi_ctx *ctx, void *table)
 	return 0;
 }
 
-void acpi_fadt_common(struct acpi_fadt *fadt, struct acpi_facs *facs,
-		      void *dsdt)
+__weak void acpi_fill_fadt(struct acpi_fadt *fadt)
 {
-	struct acpi_table_header *header = &fadt->header;
+}
+
+int acpi_write_fadt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+{
+	struct acpi_table_header *header;
+	struct acpi_fadt *fadt;
+
+	fadt = ctx->current;
+	header = &fadt->header;
 
 	memset((void *)fadt, '\0', sizeof(struct acpi_fadt));
 
 	acpi_fill_header(header, "FACP");
 	header->length = sizeof(struct acpi_fadt);
-	header->revision = ACPI_FADT_REV_ACPI_4_0;
+	header->revision = ACPI_FADT_REV_ACPI_6_0;
 	memcpy(header->oem_id, OEM_ID, 6);
 	memcpy(header->oem_table_id, OEM_TABLE_ID, 8);
 	memcpy(header->creator_id, ASLC_ID, 4);
 	header->creator_revision = 1;
 
-	fadt->x_firmware_ctrl = map_to_sysmem(facs);
-	fadt->x_dsdt = map_to_sysmem(dsdt);
+	fadt->x_firmware_ctrl = map_to_sysmem(ctx->facs);
+	fadt->x_dsdt = map_to_sysmem(ctx->dsdt);
 
-	fadt->preferred_pm_profile = ACPI_PM_MOBILE;
+	if (fadt->x_firmware_ctrl < 0x100000000UL)
+		fadt->firmware_ctrl = fadt->x_firmware_ctrl;
+	else
+		fadt->firmware_ctrl = 0;
 
-	/* Use ACPI 3.0 revision */
-	fadt->header.revision = 4; //TODO
+	if (fadt->x_dsdt < 0x100000000UL)
+		fadt->dsdt = fadt->x_dsdt;
+	else
+		fadt->dsdt = 0;
+
+	fadt->preferred_pm_profile = ACPI_PM_UNSPECIFIED;
+
+	acpi_fill_fadt(fadt);
+
+	header->checksum = table_compute_checksum(fadt, header->length);
+
+	return acpi_add_fadt(ctx, fadt);
 }
+ACPI_WRITER(5fadt, "FADT", acpi_write_fadt, 0);
+
+int acpi_write_madt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+{
+	struct acpi_table_header *header;
+	struct acpi_madt *madt;
+	void *current;
+
+	madt = ctx->current;
+
+	memset(madt, '\0', sizeof(struct acpi_madt));
+	header = &madt->header;
+
+	/* Fill out header fields */
+	acpi_fill_header(header, "APIC");
+	header->length = sizeof(struct acpi_madt);
+	header->revision = ACPI_MADT_REV_ACPI_3_0;
+
+	current = (void *)madt + sizeof(struct acpi_madt);
+	current = acpi_fill_madt(madt, current);
+
+	/* (Re)calculate length and checksum */
+	header->length = (u64)current - (u64)madt;
+
+	header->checksum = table_compute_checksum((void *)madt, header->length);
+	acpi_add_table(ctx, madt);
+	acpi_inc(ctx, madt->header.length);
+
+	return 0;
+}
+ACPI_WRITER(5madt, NULL, acpi_write_madt, 0);
 
 static void acpi_create_dbg2(struct acpi_dbg2_header *dbg2,
 		      int port_type, int port_subtype,

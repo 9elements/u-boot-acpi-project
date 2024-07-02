@@ -231,16 +231,6 @@ DefinitionBlock ("Dsdt.aml", "DSDT", 2, "RPIFDN", "RPI", 2)
       {
         Return (0xf)
       }
-      Method (_CRS, 0x0, Serialized)
-      {
-        Name (RBUF, ResourceTemplate ()
-        {
-          // No need for MEMORY32SETBASE on Genet as we have a straight base address constant
-          MEMORY32FIXED (ReadWrite, GENET_BASE_ADDRESS, GENET_LENGTH, )
-          Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive) { GENET_INTERRUPT0, GENET_INTERRUPT1 }
-        })
-        Return (RBUF)
-      }
       Name (_DSD, Package () {
         ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
         Package () {
@@ -280,6 +270,10 @@ DefinitionBlock ("Dsdt.aml", "DSDT", 2, "RPIFDN", "RPI", 2)
         Name (_PSL, Package () { \_SB_.CPU0, \_SB_.CPU1, \_SB_.CPU2, \_SB_.CPU3 })
       }
     }
+
+#include "uart.asl"
+#include "rhpx.asl"
+#include "sdhc.asl"
 
   }
 }

@@ -391,7 +391,3 @@ Device (PWM0)
     Return (^RBUF)
   }
 }
-
-#include "uart.asl"
-#include "rhpx.asl"
-#include "sdhc.asl"
