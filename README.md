@@ -23,10 +23,12 @@ cd -
 
 ```
 cd linux
-echo "CONFIG_INITRAMFS_SOURCE=\"../u-root/initramfs.cpio\"" >> arch/arm64/configs/bcm2711_defconfig
-echo "CONFIG_CMDLINE_FORCE=y"                               >> arch/arm64/configs/bcm2711_defconfig
-ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make bcm2711_defconfig
-ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -j$(nproc)
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-gnu-
+make bcm2711_defconfig
+./scripts/kconfig/merge_config.sh .config ../acpi.conf ../uroot_initramfs.conf
+make Image -j$(nproc)
+make dtbs -j$(nproc)
 cd -
 ```
 
@@ -76,3 +78,21 @@ If you do changes inside of the u-boot repository you can commit them like usual
 git subtree push --prefix u-boot [remote that points to u-boot-acpi repo] master
 ```
 This will automatically push the changes to the u-boot-acpi repository as well as keep the change in this repository.
+
+## Testing in QEMU:
+
+Starting with QEMU 9.0 you can run the RPI 4 in qemu:
+
+Update boot_cmd.txt:
+```
+fatload mmc 1:1 ${kernel_addr_r} Image
+fatsize mmc 1:1 Image
+#setenv bootargs "console=ttyS0,115200 console=tty1"
+bootefi ${kernel_addr_r}:${filesize} -
+```
+
+To run u-boot and boot from MMC run:
+```
+qemu-system-aarch64 -machine raspi4b -kernel u-boot/u-boot.bin -cpu cortex-a72 -smp 4 -m 2G -drive file=raspbian.img,format=raw,index=0 -dtb linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb -nographic
+```
+Note: Assumes you have *Image* copied into the raspbian.img image.

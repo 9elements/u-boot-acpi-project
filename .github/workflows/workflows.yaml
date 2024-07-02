@@ -1,0 +1,72 @@
+name: Firmware build action
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    types: [opened, reopened, synchronize]
+jobs:
+  uroot_build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:f2d1f92
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.MY_REPO_PAT || github.token }}
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: stable
+
+      - name: Build u-root
+        shell: bash
+        working-directory: ./u-root
+        env:
+          GOARCH: arm64
+        run: |
+          go build .
+          ./u-root -defaultsh gosh -o initramfs.cpio boot coreboot-app ./cmds/core/* ./cmds/boot/*
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: uroot-binary
+          path: |
+            ./u-root/initramfs.cpio
+
+  linux_build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:f2d1f92
+    needs: uroot_build
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.MY_REPO_PAT || github.token }}
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: uroot-binary
+          path: ./u-root/
+
+      - name: Build kernel
+        shell: bash
+        working-directory: ./linux
+        env:
+          ARCH: arm64
+          CROSS_COMPILE: aarch64-linux-gnu-
+        run: |
+          make bcm2711_defconfig
+          ./scripts/kconfig/merge_config.sh .config ../acpi.conf ../uroot_initramfs.conf
+          make Image -j$(nproc)
+          make dtbs -j$(nproc)
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-binary
+          path: |
+            ./linux/arch/arm64/boot/Image
+            ./linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb
+            ./linux/.config
