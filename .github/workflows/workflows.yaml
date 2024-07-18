@@ -8,7 +8,7 @@ jobs:
   uroot_build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/9elements/firmware-action/linux_6.1.45:f2d1f92
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:v0.3.2
     steps:
       - uses: actions/checkout@v3
         with:
@@ -37,7 +37,7 @@ jobs:
   linux_build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/9elements/firmware-action/linux_6.1.45:f2d1f92
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:v0.3.2
     needs: uroot_build
     steps:
       - uses: actions/checkout@v3
