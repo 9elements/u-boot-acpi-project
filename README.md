@@ -1,11 +1,11 @@
 # Building the project
 
 In order to build and test the project, we need a couple of ingridients.
-The ingridients have been added as git subtrees in this repository and they have the following remotes:
+The ingridients have been added as git submodules:
 
 branch: rpi-6.9.y-mcfg-quirk, remote: https://github.com/9elements/linux/
 branch: main,                 remote: https://github.com/u-root/u-root.git
-branch: acpi-max,             remote: https://github.com/9elements/u-boot-acpi
+branch: master,             remote: https://github.com/9elements/u-boot-acpi
 
 It is expected by the reader, that he/she has already installed the neccessary toolchain (aarch64-linux-gnu).
 This can be as easy as installing it using your package manager of choice.

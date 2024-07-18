@@ -1,3 +1,6 @@
 [submodule "linux"]
 	path = linux
 	url = git@github.com:9elements/linux.git
+[submodule "u-boot"]
+	path = u-boot
+	url = git@github.com:9elements/u-boot-acpi.git
