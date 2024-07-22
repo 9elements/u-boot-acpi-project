@@ -8,7 +8,7 @@ jobs:
   uroot_build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/9elements/firmware-action/linux_6.1.45:f2d1f92
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:v0.3.2
     steps:
       - uses: actions/checkout@v3
         with:
@@ -37,7 +37,7 @@ jobs:
   linux_build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/9elements/firmware-action/linux_6.1.45:f2d1f92
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:v0.3.2
     needs: uroot_build
     steps:
       - uses: actions/checkout@v3
@@ -70,3 +70,32 @@ jobs:
             ./linux/arch/arm64/boot/Image
             ./linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb
             ./linux/.config
+  uboot_build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/9elements/firmware-action/linux_6.1.45:v0.3.2
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.MY_REPO_PAT || github.token }}
+      - name: Install tools
+        shell: bash
+        run: |
+          apt-get update && apt-get install -y python3-pyelftools efitools lzop zip srecord device-tree-compiler acpica-tools python3-yaml python3-jsonschema python3-dev python3-setuptools libgnutls28-dev swig uuid-dev python3-pip
+          python3 -m pip install --user yamllint
+          ln -s /usr/bin/aarch64-linux-gnu-gcc-ar-10 /usr/bin/aarch64-linux-gnu-gcc-ar
+          ln -s /usr/bin/aarch64-linux-gnu-gcc-nm-10 /usr/bin/aarch64-linux-gnu-gcc-nm
+          ln -s /usr/bin/arm-linux-gnu-gcc-ar-10 /usr/bin/arm-linux-gnu-gcc-ar
+          ln -s /usr/bin/arm-linux-gnu-gcc-nm-10 /usr/bin/arm-linux-gnu-gcc-nm
+          ln -s /usr/bin/arm-linux-gnueabi-gcc-ar-10 /usr/bin/arm-linux-gnueabi-gcc-ar
+          ln -s /usr/bin/arm-linux-gnueabi-gcc-nm-10 /usr/bin/arm-linux-gnueabi-gcc-nm
+      - name: Build all boards
+        shell: bash
+        working-directory: ./u-boot
+        run: |
+          printf "[toolchain]\nother = /\n[toolchain-prefix]\n\n[toolchain-alias]\nriscv = riscv32\nsh = sh4\nx86 = i686\n[make-flags]\n" > ~/.buildman
+          ./tools/buildman/buildman --list-tool-chains
+          ./tools/buildman/buildman -y -Y -v -e -W -M -c 15 -l -x stm32mp15_dhcom_basic,sandbox,imx6dl_mamoj,mx6sabresd,rcar3_salvator,turris_omnia,renesas_rzg2l_smarc x86
+          ./tools/buildman/buildman -y -Y -v -e -W -M -c 15 -l -x stm32mp15_dhcom_basic,sandbox,imx6dl_mamoj,mx6sabresd,rcar3_salvator,turris_omnia,renesas_rzg2l_smarc rpi
+
